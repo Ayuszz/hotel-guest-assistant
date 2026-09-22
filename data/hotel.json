@@ -1,0 +1,46 @@
+{
+  "property": {
+    "name": "Marigold Bay Hotel",
+    "tagline": "A 48-room boutique hotel on the Goa coastline",
+    "address": "12 Coconut Grove Road, Candolim, Goa 403515, India",
+    "phone": "+91 832 555 0142",
+    "email": "stay@marigoldbay.example",
+    "checkInTime": "15:00",
+    "checkOutTime": "11:00",
+    "currency": "INR",
+    "languages": ["English", "Hindi", "Konkani"]
+  },
+  "rooms": [
+    { "id": "standard-double", "name": "Standard Double", "capacity": 2, "beds": "1 queen bed", "sizeSqm": 22, "pricePerNight": 4500, "view": "Garden", "breakfastIncluded": false, "features": ["Air conditioning", "Free Wi-Fi", "Tea and coffee maker", "Rain shower"] },
+    { "id": "twin-room", "name": "Twin Room", "capacity": 2, "beds": "2 single beds", "sizeSqm": 22, "pricePerNight": 4500, "view": "Garden", "breakfastIncluded": false, "features": ["Air conditioning", "Free Wi-Fi", "Work desk", "Rain shower"] },
+    { "id": "deluxe-king", "name": "Deluxe King", "capacity": 2, "beds": "1 king bed", "sizeSqm": 30, "pricePerNight": 6800, "view": "Partial sea view", "breakfastIncluded": true, "features": ["Private balcony", "Air conditioning", "Free Wi-Fi", "Minibar", "Bathtub"] },
+    { "id": "junior-suite", "name": "Junior Suite", "capacity": 3, "beds": "1 king bed and 1 sofa bed", "sizeSqm": 42, "pricePerNight": 9200, "view": "Sea view", "breakfastIncluded": true, "features": ["Separate living area", "Private balcony", "Nespresso machine", "Bathtub", "Free Wi-Fi"] },
+    { "id": "family-suite", "name": "Family Suite", "capacity": 4, "beds": "1 king bed and 2 single beds in a second bedroom", "sizeSqm": 58, "pricePerNight": 12500, "view": "Sea view", "breakfastIncluded": true, "features": ["Two bedrooms", "Two bathrooms", "Kitchenette", "Private terrace", "Free Wi-Fi"] }
+  ],
+  "amenities": [
+    { "name": "Swimming pool", "description": "Outdoor infinity pool overlooking the bay, 25 metres long, with a shallow children's section.", "hours": "07:00 to 20:00", "cost": "Free for guests" },
+    { "name": "Breakfast", "description": "Buffet breakfast at the Saffron restaurant with Indian and continental options. Included for Deluxe King, Junior Suite and Family Suite. Available as an add-on for Standard Double and Twin Room.", "hours": "07:00 to 10:30", "cost": "INR 650 per person per day when not included" },
+    { "name": "Fitness centre", "description": "Small gym with treadmills, free weights and a rowing machine.", "hours": "24 hours", "cost": "Free for guests" },
+    { "name": "Spa", "description": "Two treatment rooms offering Ayurvedic massages. Booking required at reception.", "hours": "10:00 to 19:00", "cost": "Treatments from INR 2500" },
+    { "name": "Parking", "description": "On-site parking for 20 cars, first come first served.", "hours": "24 hours", "cost": "Free for guests" },
+    { "name": "Wi-Fi", "description": "Free high-speed Wi-Fi in all rooms and public areas.", "hours": "24 hours", "cost": "Free" },
+    { "name": "Airport shuttle", "description": "Shared shuttle to and from Goa International Airport (Dabolim), about 45 minutes. Book at least 24 hours ahead.", "hours": "06:00 to 22:00", "cost": "INR 1200 per car each way" },
+    { "name": "Restaurant and bar", "description": "Saffron serves lunch and dinner; the Tide Bar on the pool deck serves drinks and snacks.", "hours": "Saffron 12:30 to 15:00 and 19:00 to 22:30; Tide Bar 11:00 to 23:00", "cost": "A la carte" }
+  ],
+  "policies": [
+    { "topic": "Check-in and check-out", "text": "Check-in is from 15:00 and check-out is by 11:00. Early check-in and late check-out are subject to availability and may carry a charge of INR 1500. A government-issued photo ID is required for all adult guests at check-in." },
+    { "topic": "Cancellation", "text": "Free cancellation up to 48 hours before the check-in date. Cancellations within 48 hours, or no-shows, are charged the first night. Non-refundable rates, where booked, cannot be cancelled or changed." },
+    { "topic": "Children and extra beds", "text": "Children under 6 stay free when sharing existing beds. One extra bed can be added to Deluxe King and Junior Suite for INR 1500 per night. Cribs are free on request." },
+    { "topic": "Pets", "text": "Pets are not allowed, with the exception of certified assistance animals." },
+    { "topic": "Smoking", "text": "All rooms are non-smoking. A designated smoking area is available on the pool deck. A cleaning fee of INR 5000 applies for smoking in rooms." },
+    { "topic": "Payment", "text": "We accept Visa, Mastercard, American Express, UPI and cash in INR. A refundable security deposit of INR 5000 is held at check-in." },
+    { "topic": "Accessibility", "text": "Two Standard Double rooms on the ground floor are wheelchair accessible with roll-in showers. The pool deck and restaurant are step-free." }
+  ],
+  "faqs": [
+    { "question": "How far is the hotel from the beach?", "answer": "Candolim Beach is a 4-minute walk through the garden gate." },
+    { "question": "Is there a minimum stay?", "answer": "A two-night minimum applies between 20 December and 5 January. There is no minimum stay at other times." },
+    { "question": "Do you offer room service?", "answer": "Room service is available from 07:00 to 23:00 from the Saffron menu." },
+    { "question": "Can I store luggage before check-in or after check-out?", "answer": "Yes, complimentary luggage storage is available at reception on the day of arrival and departure." },
+    { "question": "Do rooms have a kitchen?", "answer": "Only the Family Suite has a kitchenette with a microwave, fridge and induction hob. All rooms have a tea and coffee maker." }
+  ]
+}

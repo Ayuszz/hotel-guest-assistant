@@ -1,0 +1,23 @@
+{
+  "note": "Mock inventory. totalRooms is the count per room type; bookings list occupied ranges [checkIn, checkOut) per room type.",
+  "rooms": {
+    "standard-double": { "totalRooms": 16, "bookings": [
+      { "checkIn": "2026-10-03", "checkOut": "2026-10-06", "count": 16 },
+      { "checkIn": "2026-12-24", "checkOut": "2026-12-27", "count": 16 }
+    ] },
+    "twin-room": { "totalRooms": 10, "bookings": [
+      { "checkIn": "2026-10-03", "checkOut": "2026-10-06", "count": 10 }
+    ] },
+    "deluxe-king": { "totalRooms": 12, "bookings": [
+      { "checkIn": "2026-10-03", "checkOut": "2026-10-05", "count": 11 },
+      { "checkIn": "2026-12-24", "checkOut": "2026-12-27", "count": 12 }
+    ] },
+    "junior-suite": { "totalRooms": 6, "bookings": [
+      { "checkIn": "2026-11-14", "checkOut": "2026-11-16", "count": 6 }
+    ] },
+    "family-suite": { "totalRooms": 4, "bookings": [
+      { "checkIn": "2026-11-14", "checkOut": "2026-11-16", "count": 4 },
+      { "checkIn": "2026-12-24", "checkOut": "2026-12-27", "count": 4 }
+    ] }
+  }
+}
