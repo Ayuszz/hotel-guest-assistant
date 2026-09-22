@@ -1,6 +1,6 @@
 # API examples
 
-Base URL: `http://localhost:3000` locally, or the deployed Vercel URL. All examples run against the mock provider as well; with a Gemini key the wording of `text` answers changes but the shapes do not.
+Base URL: `http://localhost:3000` locally, or the live deployment `https://hotel-guest-assistant-lilac.vercel.app`. All examples run against the mock provider as well; with a Gemini key the wording of `text` answers changes but the shapes do not.
 
 ## Health
 

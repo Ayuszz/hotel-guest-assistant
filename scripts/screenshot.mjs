@@ -1,5 +1,5 @@
 import { chromium, devices } from "@playwright/test";
-const base = "http://localhost:3300";
+const base = process.env.BASE_URL ?? "http://localhost:3300";
 const b = await chromium.launch();
 for (const [name, ctx] of [["desktop", { viewport: { width: 1280, height: 800 } }], ["mobile", devices["Pixel 7"]]]) {
   const c = await b.newContext(ctx); const p = await c.newPage();

@@ -63,6 +63,10 @@ Extra live checks beyond the matrix:
 
 Before the model chain and the single-call refactor, the same run produced 8 to 11 `llm_unavailable` fallbacks out of 16 and a 12 s median. On a paid tier or a stable model this collapses to 1 to 3 s per turn; the chain, timeouts and fallbacks are what keep the free-tier demo usable.
 
+## Live deployment check (2026-09-22)
+
+Same demo path run with curl against the production URL https://hotel-guest-assistant-lilac.vercel.app after deploy: health reports `gemini:gemini-3.1-flash-lite`; check-in time, three-guest room, follow-up price via client-carried history, availability clarification, form-based availability (Junior Suite + Family Suite), out-of-scope fallback and a 400 validation error all returned the expected envelope. Screenshots in `docs/screenshots/` were captured from the live site.
+
 ## Known gaps
 
 - Keyword retrieval can miss paraphrases ("bathing area" for pool). Embeddings would fix this; see decisions.

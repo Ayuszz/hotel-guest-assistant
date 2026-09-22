@@ -2,7 +2,7 @@
 
 A small full-stack app: a chat interface where hotel guests ask about the property and check room availability. The frontend is Next.js; the backend is a set of Next.js route handlers that ground a Gemini model in a JSON knowledge base and call a deterministic availability tool.
 
-**Live demo:** _URL added after deploy_ · **Live-model eval:** 17/17 scenarios pass, see [evaluation](docs/evaluation.md) · **Docs:** [Architecture](#architecture) · [API examples](docs/api-examples.md) · [Decisions](docs/decisions.md) · [Evaluation](docs/evaluation.md) · [AI tools used](docs/ai-tools-used.md)
+**Live demo:** https://hotel-guest-assistant-lilac.vercel.app (Vercel Hobby, Gemini free tier, so the first reply can take 10 to 20 s while the model chain finds a responsive model) · **Live-model eval:** 17/17 scenarios pass, see [evaluation](docs/evaluation.md) · **Docs:** [Architecture](#architecture) · [API examples](docs/api-examples.md) · [Decisions](docs/decisions.md) · [Evaluation](docs/evaluation.md) · [AI tools used](docs/ai-tools-used.md)
 
 ## Quick start
 
