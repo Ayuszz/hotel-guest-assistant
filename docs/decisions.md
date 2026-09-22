@@ -24,7 +24,7 @@ Guests researching a stay have small, urgent questions (check-in time, pool, bre
 
 ## Which parts use AI and which stay deterministic?
 
-| AI (Gemini) | Deterministic code |
+| AI (LLM) | Deterministic code |
 | --- | --- |
 | Classify intent (knowledge / availability / greeting / unsupported) | Keyword retrieval over the knowledge base |
 | Extract dates and guest count when stated | Date validation (format, real date, not past, order, ≤ 30 nights) |
@@ -59,8 +59,8 @@ Rule of thumb: if a wrong answer would cost the hotel money or trust (price, ava
 
 | Failure | Behaviour |
 | --- | --- |
-| Model timeout, network error, malformed JSON on classify | Heuristic routing: obvious availability phrasing → clarification form (still fully functional, no model needed); otherwise `fallback` with reason `llm_unavailable` and the contact line |
-| Same on answer | `fallback`, `llm_unavailable`; logged with provider and error |
+| Model timeout, 429/503, malformed JSON from a provider | Next model in that provider, then the next provider (Cerebras → Groq → Gemini), each within a total time budget |
+| Every provider down | Heuristic routing: obvious availability phrasing → clarification form (still fully functional, no model needed); otherwise `fallback` with reason `llm_unavailable` and the contact line |
 | Bad request | HTTP 400 with `type: "error"` and a readable message |
 | Unhandled server exception | HTTP 500 `code: INTERNAL`; the frontend shows a retryable error bubble |
 | Browser cannot reach the API or it takes > 35 s | Client-side timeout via AbortController; error bubble with Try again; history preserved |
@@ -95,8 +95,8 @@ Every request logs one JSON line with request id, conversation id, response type
 | Choice | Why | Alternative rejected |
 | --- | --- | --- |
 | Next.js route handlers for the backend | One deploy, one language, free hosting on Vercel with no cold-sleep; still a separate `src/server` module with its own tests | Separate Express/Fastify service: free hosts sleep 30 to 60 s, hurting the demo |
-| Gemini via a model chain (see below) | Free tier, JSON schema output; free-tier models returned 503s and slow responses during evaluation, so the provider tries a chain of models | Anthropic/OpenAI: paid |
-| Provider interface + mock | Tests need no key; app runs offline; swapping models touches one file | Mocking `fetch` per test: brittle |
+| Cerebras Llama 3.3 70B primary, Groq and Gemini as optional fallbacks | All free tiers with JSON output. Gemini free tier was slow (10 to 20 s) and overloaded during evaluation; Cerebras answers in about a second. A provider chain plus per-provider model chain keeps the demo alive when any one is down | Anthropic/OpenAI: paid |
+| Provider interface + mock | Tests need no key; app runs offline; a new provider is one file implementing `respond()` | Mocking `fetch` per test: brittle |
 | Client-carried history | Correct on serverless; the server store is a bonus | Server-only memory: breaks across instances |
 | Zod validation | Typed request schema with readable errors | Manual checks |
 | JSON knowledge base | Small, reviewable by hotel staff, versioned in git | Database: extra setup for reviewers |
