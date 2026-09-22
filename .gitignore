@@ -11,3 +11,6 @@ playwright-report
 .DS_Store
 next-env.d.ts
 .vercel
+
+# private interview-prep material, kept outside the repo
+deliverables/10-submission-kit.*
