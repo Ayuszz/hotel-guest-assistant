@@ -95,7 +95,7 @@ Every request logs one JSON line with request id, conversation id, response type
 | Choice | Why | Alternative rejected |
 | --- | --- | --- |
 | Next.js route handlers for the backend | One deploy, one language, free hosting on Vercel with no cold-sleep; still a separate `src/server` module with its own tests | Separate Express/Fastify service: free hosts sleep 30 to 60 s, hurting the demo |
-| Cerebras Llama 3.3 70B primary, Groq and Gemini as optional fallbacks | All free tiers with JSON output. Gemini free tier was slow (10 to 20 s) and overloaded during evaluation; Cerebras answers in about a second. A provider chain plus per-provider model chain keeps the demo alive when any one is down | Anthropic/OpenAI: paid |
+| Cerebras gpt-oss-120b primary, Groq and Gemini as optional fallbacks | All free tiers with JSON output. Gemini free tier was slow (10 to 20 s) and overloaded during evaluation; Cerebras answers in about a second. A provider chain plus per-provider model chain keeps the demo alive when any one is down | Anthropic/OpenAI: paid |
 | Provider interface + mock | Tests need no key; app runs offline; a new provider is one file implementing `respond()` | Mocking `fetch` per test: brittle |
 | Client-carried history | Correct on serverless; the server store is a bonus | Server-only memory: breaks across instances |
 | Zod validation | Typed request schema with readable errors | Manual checks |

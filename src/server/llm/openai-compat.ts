@@ -133,7 +133,7 @@ export function cerebrasProvider(fetchImpl?: typeof fetch): OpenAICompatProvider
     name: "cerebras",
     baseUrl: process.env.CEREBRAS_BASE_URL ?? "https://api.cerebras.ai/v1",
     apiKey: process.env.CEREBRAS_API_KEY ?? "",
-    models: parseChain(process.env.CEREBRAS_MODEL, process.env.CEREBRAS_FALLBACK_MODELS, ["llama-3.3-70b", "llama3.1-8b"]),
+    models: parseChain(process.env.CEREBRAS_MODEL, process.env.CEREBRAS_FALLBACK_MODELS, ["gpt-oss-120b", "qwen-3.8-27b"]),
     fetchImpl,
   });
 }

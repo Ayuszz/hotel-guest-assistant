@@ -1,6 +1,6 @@
 # Marigold Bay Hotel — AI Guest Assistant
 
-A small full-stack app: a chat interface where hotel guests ask about the property and check room availability. The frontend is Next.js; the backend is a set of Next.js route handlers that ground an LLM (Cerebras Llama 3.3 70B by default, with Groq and Gemini as optional fallbacks) in a JSON knowledge base and call a deterministic availability tool.
+A small full-stack app: a chat interface where hotel guests ask about the property and check room availability. The frontend is Next.js; the backend is a set of Next.js route handlers that ground an LLM (Cerebras gpt-oss-120b by default, with Groq and Gemini as optional fallbacks) in a JSON knowledge base and call a deterministic availability tool.
 
 **Live demo:** https://hotel-guest-assistant-lilac.vercel.app (Vercel Hobby, Cerebras free tier, replies typically in about a second) · **Live-model eval:** 17/17 scenarios pass, see [evaluation](docs/evaluation.md) · **Docs:** [Architecture](#architecture) · [API examples](docs/api-examples.md) · [Decisions](docs/decisions.md) · [Evaluation](docs/evaluation.md) · [AI tools used](docs/ai-tools-used.md)
 
@@ -96,7 +96,7 @@ docs/            api-examples, decisions, evaluation, ai-tools-used
 | --- | --- | --- |
 | `LLM_PROVIDER` | `cerebras,groq,gemini` | provider order; `mock` forces offline mode |
 | `CEREBRAS_API_KEY` | — | enables Cerebras (recommended) |
-| `CEREBRAS_MODEL` / `CEREBRAS_FALLBACK_MODELS` | `llama-3.3-70b` / `llama3.1-8b` | Cerebras model chain |
+| `CEREBRAS_MODEL` / `CEREBRAS_FALLBACK_MODELS` | `gpt-oss-120b` / `qwen-3.8-27b` | Cerebras model chain (the ids your key can access; check `GET /v1/models`) |
 | `GROQ_API_KEY`, `GROQ_MODEL` | — / `llama-3.3-70b-versatile` | optional Groq |
 | `GEMINI_API_KEY`, `GEMINI_MODEL`, `GEMINI_FALLBACK_MODELS` | — / `gemini-3.1-flash-lite` / three fallbacks | optional Gemini |
 | `LLM_TIMEOUT_MS` | `9000` | per-model-attempt timeout; a stall moves to the next model |
