@@ -22,7 +22,7 @@ const SUGGESTIONS = [
   "Do you have rooms available for a given date?",
 ];
 
-const REQUEST_TIMEOUT_MS = 25_000;
+const REQUEST_TIMEOUT_MS = 35_000;
 const HISTORY_LIMIT = 10;
 let counter = 0;
 const nextId = () => `${Date.now()}-${counter++}`;

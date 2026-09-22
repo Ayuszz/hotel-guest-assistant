@@ -63,7 +63,7 @@ Rule of thumb: if a wrong answer would cost the hotel money or trust (price, ava
 | Same on answer | `fallback`, `llm_unavailable`; logged with provider and error |
 | Bad request | HTTP 400 with `type: "error"` and a readable message |
 | Unhandled server exception | HTTP 500 `code: INTERNAL`; the frontend shows a retryable error bubble |
-| Browser cannot reach the API or it takes > 25 s | Client-side timeout via AbortController; error bubble with Try again; history preserved |
+| Browser cannot reach the API or it takes > 35 s | Client-side timeout via AbortController; error bubble with Try again; history preserved |
 | Form-based availability | Never touches the model, so it works even when the LLM is down |
 
 Every request logs one JSON line with request id, conversation id, response type, intent, and latency.
@@ -95,7 +95,7 @@ Every request logs one JSON line with request id, conversation id, response type
 | Choice | Why | Alternative rejected |
 | --- | --- | --- |
 | Next.js route handlers for the backend | One deploy, one language, free hosting on Vercel with no cold-sleep; still a separate `src/server` module with its own tests | Separate Express/Fastify service: free hosts sleep 30 to 60 s, hurting the demo |
-| Gemini 2.5 Flash | Free tier, JSON schema output, fast | Anthropic/OpenAI: paid |
+| Gemini via a model chain (see below) | Free tier, JSON schema output; free-tier models returned 503s and slow responses during evaluation, so the provider tries a chain of models | Anthropic/OpenAI: paid |
 | Provider interface + mock | Tests need no key; app runs offline; swapping models touches one file | Mocking `fetch` per test: brittle |
 | Client-carried history | Correct on serverless; the server store is a bonus | Server-only memory: breaks across instances |
 | Zod validation | Typed request schema with readable errors | Manual checks |

@@ -108,13 +108,18 @@ describe("handleChat: availability (tool calling)", () => {
 describe("handleChat: conversation follow-ups", () => {
   it("passes history to the model so 'how much is it' can be resolved", async () => {
     let seenHistory = 0;
+    // Simulates the model using the history to pick the room discussed in the previous turn.
     const p = new MockProvider({
-      answer: (m, ctx) => ({ answer: ctx[0]?.text ?? "", grounded: true, sources: [ctx[0]?.id] }),
-      classify: (m, h) => { seenHistory = h.length; return { intent: "knowledge", slots: {}, topics: ["junior", "suite", "price"] }; },
+      classify: (m, h) => { seenHistory = h.length; return { intent: "knowledge", slots: {}, topics: [] }; },
+      answer: (m, ctx) => {
+        const junior = ctx.find((c) => c.id === "room:junior-suite");
+        return junior ? { answer: junior.text, grounded: true, sources: [junior.id] } : { answer: "", grounded: false, sources: [] };
+      },
     });
     await ask("Which room is suitable for three guests?", {}, p);
     const r = await ask("How much is it per night?", {}, p);
     expect(seenHistory).toBe(2);
+    expect(r.body.type).toBe("text");
     expect(r.body.message).toMatch(/9200/);
   });
   it("uses client-carried history when the server store is empty (serverless case)", async () => {

@@ -2,7 +2,7 @@
 
 A small full-stack app: a chat interface where hotel guests ask about the property and check room availability. The frontend is Next.js; the backend is a set of Next.js route handlers that ground a Gemini model in a JSON knowledge base and call a deterministic availability tool.
 
-**Live demo:** _URL added after deploy_ · **Docs:** [Architecture](#architecture) · [API examples](docs/api-examples.md) · [Decisions](docs/decisions.md) · [Evaluation](docs/evaluation.md) · [AI tools used](docs/ai-tools-used.md)
+**Live demo:** _URL added after deploy_ · **Live-model eval:** 17/17 scenarios pass, see [evaluation](docs/evaluation.md) · **Docs:** [Architecture](#architecture) · [API examples](docs/api-examples.md) · [Decisions](docs/decisions.md) · [Evaluation](docs/evaluation.md) · [AI tools used](docs/ai-tools-used.md)
 
 ## Quick start
 
@@ -17,7 +17,7 @@ npm run dev                   # http://localhost:3000
 No key? Leave `GEMINI_API_KEY` unset (or set `LLM_PROVIDER=mock`) and the app runs fully offline with a deterministic mock model. Every test uses that mock, so the suite needs no network or key.
 
 ```bash
-npm test          # 43 unit + integration tests (vitest)
+npm test          # 52 unit + integration tests (vitest)
 npm run test:e2e  # Playwright: full browser flow, desktop + mobile (builds the app first)
 npm run typecheck
 npm run lint
@@ -56,7 +56,7 @@ Browser (Next.js, React 19)                  Server (Next.js route handlers, Nod
                                                    data/hotel.json      data/inventory.json
 ```
 
-**Data flow for a question.** The browser posts the message, a conversation id and the last 10 turns. The server asks the model one JSON question: intent, any dates or guest count it can extract, and topic keywords. Knowledge questions then go through keyword retrieval over the JSON, and the model is asked to answer *only* from the retrieved sections, returning `grounded: false` if it cannot. Any number in the answer that is not present in the retrieved text rejects the answer. Availability requests never reach the model for the answer: the tool runs in code and the reply text is templated.
+**Data flow for a question.** The browser posts the message, a conversation id and the last 10 turns. The server retrieves matching knowledge-base sections by keyword, then makes **one** JSON-schema call to the model that returns intent, any dates or guest count it can extract, and, for knowledge questions, an answer written *only* from those sections with `grounded: false` when they do not cover it. Any number in the answer that is not present in the retrieved text rejects the answer. Availability requests never reach the model for the answer: the tool runs in code and the reply text is templated. If the model stalls or is overloaded, the provider tries the next model in a chain; if all fail, deterministic routing still sends availability requests to the date form and everything else to a fallback with the front-desk contact.
 
 **Where AI is used:** understanding the question, extracting dates and counts, phrasing the grounded answer.
 **Where it is not:** retrieval, date validation, capacity filtering, pricing, availability, response shape, fallbacks.
@@ -92,9 +92,11 @@ docs/            api-examples, decisions, evaluation, ai-tools-used
 | name | default | purpose |
 | --- | --- | --- |
 | `GEMINI_API_KEY` | — | Gemini key. Unset → mock provider |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | model id |
+| `GEMINI_MODEL` | `gemini-3.1-flash-lite` | primary model id |
+| `GEMINI_FALLBACK_MODELS` | `gemini-3-flash-preview,gemini-flash-lite-latest,gemini-3.6-flash` | comma-separated models tried when the primary returns 503/429/404 |
 | `LLM_PROVIDER` | `gemini` if key set, else `mock` | force `mock` for offline runs |
-| `LLM_TIMEOUT_MS` | `15000` | per-call timeout before fallback |
+| `LLM_TIMEOUT_MS` | `9000` | per-model-attempt timeout; a stall moves to the next model |
+| `LLM_TOTAL_BUDGET_MS` | `24000` | stop trying further models after this much time |
 
 ## Deploying to Vercel (free)
 

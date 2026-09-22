@@ -4,7 +4,7 @@ import { checkAvailability, ValidationError } from "./availability";
 import { conversationStore, type ConversationStore } from "./conversation";
 import { CONTACT_LINE, HOTEL_NAME, retrieve } from "./knowledge";
 import { getProvider } from "./llm";
-import { LLMError, type LLMProvider } from "./llm/provider";
+import { type LLMProvider, type ModelTurn } from "./llm/provider";
 import { log } from "./logger";
 import {
   AvailabilityParamsSchema,
@@ -12,7 +12,6 @@ import {
   type AvailabilityParams,
   type AvailabilityResult,
   type ChatResponse,
-  type Classification,
 } from "./types";
 
 export type Deps = { provider?: LLMProvider; store?: ConversationStore; today?: Date };
@@ -65,16 +64,19 @@ export async function handleChat(input: unknown, deps: Deps = {}): Promise<Handl
   const message = req.message!;
   const provider = deps.provider ?? getProvider();
 
-  // Step 1: classify (LLM), with a deterministic fallback if the model is down.
-  let cls: Classification;
+  // One model call: intent + slots + grounded answer over the retrieved context.
+  // If the model is down, fall back to deterministic routing so availability still works.
+  const context = retrieve(message);
+  let turn: ModelTurn;
   let llmDown = false;
   try {
-    cls = await provider.classify(message, history, today.toISOString().slice(0, 10));
+    turn = await provider.respond({ message, history, today: today.toISOString().slice(0, 10), context });
   } catch (e) {
     llmDown = true;
-    log("error", "llm.classify_failed", { requestId, provider: provider.name, error: (e as Error).message });
-    cls = { intent: AVAILABILITY_HINT.test(message) ? "availability" : "knowledge", slots: {}, topics: [] };
+    log("error", "llm.respond_failed", { requestId, provider: provider.name, error: (e as Error).message });
+    turn = { intent: AVAILABILITY_HINT.test(message) ? "availability" : "knowledge", slots: {}, topics: [], answer: "", grounded: false, sources: [] };
   }
+  const cls = turn;
 
   const finish = (body: ChatResponse, extra: Record<string, unknown> = {}) => {
     store.append(conversationId, { role: "user", content: message }, { role: "assistant", content: body.message });
@@ -116,28 +118,15 @@ export async function handleChat(input: unknown, deps: Deps = {}): Promise<Handl
   if (llmDown) {
     return finish({ type: "fallback", conversationId, message: UNAVAILABLE_TEXT, reason: "llm_unavailable" });
   }
-  const context = retrieve(message, cls.topics);
-  if (context.length === 0) {
+  if (context.length === 0 || !turn.grounded) {
     return finish({ type: "fallback", conversationId, message: FALLBACK_TEXT, reason: "not_in_knowledge_base" });
   }
-  try {
-    const ans = await provider.answer(message, history, context);
-    if (!ans.grounded) {
-      return finish({ type: "fallback", conversationId, message: FALLBACK_TEXT, reason: "not_in_knowledge_base" });
-    }
-    const unverified = unverifiedFigures(ans.answer, context.map((c) => c.text));
-    if (unverified.length > 0) {
-      log("warn", "chat.unverified_figures", { requestId, unverified, answer: ans.answer });
-      return finish({ type: "fallback", conversationId, message: FALLBACK_TEXT, reason: "unverified_figure" }, { unverified });
-    }
-    return finish({ type: "text", conversationId, message: ans.answer, sources: ans.sources.filter((s) => context.some((c) => c.id === s)) });
-  } catch (e) {
-    if (e instanceof LLMError) {
-      log("error", "llm.answer_failed", { requestId, provider: provider.name, error: e.message });
-      return finish({ type: "fallback", conversationId, message: UNAVAILABLE_TEXT, reason: "llm_unavailable" });
-    }
-    throw e;
+  const unverified = unverifiedFigures(turn.answer, context.map((c) => c.text));
+  if (unverified.length > 0) {
+    log("warn", "chat.unverified_figures", { requestId, unverified, answer: turn.answer });
+    return finish({ type: "fallback", conversationId, message: FALLBACK_TEXT, reason: "unverified_figure" }, { unverified });
   }
+  return finish({ type: "text", conversationId, message: turn.answer, sources: turn.sources.filter((id) => context.some((c) => c.id === id)) });
 }
 
 /** Any number with 3+ digits in the answer must appear in the context, else the answer is rejected. */

@@ -2,7 +2,7 @@ import type { Classification, HistoryTurn } from "../types";
 import type { KBSection } from "../knowledge";
 
 export type GroundedAnswer = {
-  /** The reply text for the guest. */
+  /** The reply text for the guest. Empty when not grounded or when intent is not knowledge. */
   answer: string;
   /** false when the model judged the context insufficient; caller returns a fallback. */
   grounded: boolean;
@@ -10,10 +10,21 @@ export type GroundedAnswer = {
   sources: string[];
 };
 
+/** One model round-trip: routing + slot extraction + grounded answer in a single response. */
+export type ModelTurn = Classification & GroundedAnswer;
+
+export type RespondInput = {
+  message: string;
+  history: HistoryTurn[];
+  /** ISO date, so relative dates can be resolved. */
+  today: string;
+  /** Knowledge-base sections retrieved for the message; the only facts the model may use. */
+  context: KBSection[];
+};
+
 export interface LLMProvider {
   readonly name: string;
-  classify(message: string, history: HistoryTurn[], today: string): Promise<Classification>;
-  answer(message: string, history: HistoryTurn[], context: KBSection[]): Promise<GroundedAnswer>;
+  respond(input: RespondInput): Promise<ModelTurn>;
 }
 
 export class LLMError extends Error {

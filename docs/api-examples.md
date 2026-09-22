@@ -8,7 +8,7 @@ Base URL: `http://localhost:3000` locally, or the deployed Vercel URL. All examp
 curl -s http://localhost:3000/api/health
 ```
 ```json
-{"status":"ok","provider":"gemini:gemini-2.5-flash","time":"2026-09-22T18:04:14.610Z"}
+{"status":"ok","provider":"gemini:gemini-3.1-flash-lite","time":"2026-09-22T18:04:14.610Z"}
 ```
 
 ## 1. A property question

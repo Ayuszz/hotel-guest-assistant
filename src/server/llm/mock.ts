@@ -1,6 +1,6 @@
 import type { Classification, HistoryTurn } from "../types";
 import type { KBSection } from "../knowledge";
-import { LLMError, type GroundedAnswer, type LLMProvider } from "./provider";
+import { LLMError, type GroundedAnswer, type LLMProvider, type ModelTurn, type RespondInput } from "./provider";
 
 export type MockBehaviour = {
   classify?: (message: string, history: HistoryTurn[]) => Classification;
@@ -18,13 +18,12 @@ export class MockProvider implements LLMProvider {
   constructor(private behaviour: MockBehaviour = {}) {}
 
   private maybeFail(): void {
-    if (this.behaviour.fail === "timeout") throw new LLMError("classify timed out after 1ms");
-    if (this.behaviour.fail === "malformed") throw new LLMError("answer returned malformed JSON");
-    if (this.behaviour.fail === "network") throw new LLMError("request failed: fetch failed");
+    if (this.behaviour.fail === "timeout") throw new LLMError("respond timed out after 1ms");
+    if (this.behaviour.fail === "malformed") throw new LLMError("respond returned malformed JSON");
+    if (this.behaviour.fail === "network") throw new LLMError("respond request failed: fetch failed");
   }
 
-  async classify(message: string, history: HistoryTurn[]): Promise<Classification> {
-    this.maybeFail();
+  classify(message: string, history: HistoryTurn[]): Classification {
     if (this.behaviour.classify) return this.behaviour.classify(message, history);
     const m = message.toLowerCase();
     if (/^(hi|hello|hey|thanks|thank you)\b/.test(m)) return { intent: "greeting", slots: {}, topics: [] };
@@ -41,10 +40,16 @@ export class MockProvider implements LLMProvider {
     return { intent: "knowledge", slots: {}, topics: [] };
   }
 
-  async answer(message: string, _history: HistoryTurn[], context: KBSection[]): Promise<GroundedAnswer> {
-    this.maybeFail();
+  answer(message: string, context: KBSection[]): GroundedAnswer {
     if (this.behaviour.answer) return this.behaviour.answer(message, context);
     if (context.length === 0) return { answer: "", grounded: false, sources: [] };
     return { answer: context[0].text, grounded: true, sources: [context[0].id] };
+  }
+
+  async respond({ message, history, context }: RespondInput): Promise<ModelTurn> {
+    this.maybeFail();
+    const cls = this.classify(message, history);
+    const ans = cls.intent === "knowledge" ? this.answer(message, context) : { answer: "", grounded: false, sources: [] };
+    return { ...cls, ...ans };
   }
 }

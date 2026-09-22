@@ -3,6 +3,7 @@ import { handleChat } from "@/server/chat";
 import { log } from "@/server/logger";
 
 export const runtime = "nodejs";
+export const maxDuration = 30; // seconds; free-tier models can be slow and the provider may try several
 
 export async function POST(request: Request) {
   let body: unknown;
