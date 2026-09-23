@@ -21,9 +21,9 @@ export type AvailabilityParams = z.infer<typeof AvailabilityParamsSchema>;
 
 export const ChatRequestSchema = z
   .object({
-    conversationId: z.string().min(1).max(100).optional(),
+    // Omitted on the first message of a new thread; the server creates one and returns its id.
+    conversationId: z.string().uuid("Invalid conversation id").optional(),
     message: z.string().trim().min(1, "Message is required").max(1000).optional(),
-    history: z.array(HistoryTurnSchema).max(20).default([]),
     availability: AvailabilityParamsSchema.optional(),
   })
   .refine((r) => r.message || r.availability, {

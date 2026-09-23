@@ -1,8 +1,10 @@
 # Evaluation and test scenarios
 
-Two layers. **Automated** (52 vitest tests + 2 Playwright flows × 2 devices) run against the deterministic mock model, so they are repeatable and need no key. **Live-model pass** runs the same scenarios manually against Gemini and records what the model actually said.
+Two layers. **Automated** (vitest + Playwright, both against the deterministic mock model) are repeatable and need no LLM key — Playwright does need a real Supabase project. **Live-model pass** runs scenarios manually against a real model and records what it actually said.
 
 Run: `npm test` · `npm run test:e2e`
+
+The scenario matrix and live-model passes below (52 vitest tests, 2 Playwright flows × 2 devices, Gemini/Cerebras results) describe the pre-auth version of the app, where `/api/chat` took no session and carried history in the request body. They're kept as historical record. Current counts (85 vitest tests, 12 Playwright tests, auth-gated `/api/chat`) are in "Auth, persistence and bookings rewrite — local verification" below.
 
 ## Scenario matrix
 
@@ -80,6 +82,28 @@ After switching the provider order to `cerebras (gpt-oss-120b) → gemini`, the 
 | Form-based availability (no model) | 0.4 s | 0.4 s |
 
 Observed answers matched the earlier run in substance. Two notes: scenario 5 ("Is it free?") is still read as "free of charge"; and the follow-up "How much is it per night?" listed every room's price instead of only the Junior Suite discussed before, which is correct but less focused than the Gemini answer. Both are prompt-tuning items, not correctness failures.
+
+## Auth, persistence and bookings rewrite — local verification (2026-09-23)
+
+The sections above predate a rewrite that added Supabase email/password auth (hard login wall), moved conversation history and slot memory from client-carried/in-memory to Postgres (`ConversationRepo`), and added a bookings/simulated-payments flow. That rewrite was verified locally, against a real Supabase project (not the live Vercel deployment — this pass was scoped local-only) and the deterministic mock LLM provider. Every command below was actually run in this session; no numbers here are estimated.
+
+```
+npm test:        Test Files  9 passed (9)  ·  Tests  85 passed (85)
+npm run typecheck: clean (tsc --noEmit, no output)
+npm run lint:     clean (eslint, no output)
+npm run build:    success — Route (app) lists / (dynamic, middleware-gated), /api/auth/{signup,logout},
+                  /api/bookings, /api/chat, /api/conversations[/[id]/messages], /api/health (all dynamic),
+                  /bookings, /login, /signup (static)
+npm run test:e2e: 12 passed (12) — desktop + mobile Chromium projects, against the real Supabase project
+                  above with LLM_PROVIDER=mock, ~1.1 minutes. Covers: unauthenticated redirect to /login,
+                  wrong-password inline error, full guest journey (sign up → question → follow-up →
+                  availability form → book & pay → thread in sidebar → server-500 → retry → bookings page),
+                  new-thread/switch-thread history isolation, sign-out re-blocking the app, health endpoint.
+```
+
+Manual curl smoke test (production build, `LLM_PROVIDER=mock`, real Supabase) additionally confirmed: sign-up issues a session cookie and the created account can be reused (duplicate sign-up correctly returns `409 EMAIL_TAKEN`); `/api/chat` returns `401 UNAUTHENTICATED` with no session cookie; a chat thread persists across separate `curl` invocations sharing a cookie jar (continuing a `conversationId` returns that thread's own prior turns via `/api/conversations/:id/messages`, including the full response `envelope` for exact UI reconstruction); `/api/conversations` lists threads ordered by `updated_at` with an auto-derived title from the first message; `/api/bookings` POST returns a `confirmed`/`paid` booking with a `MOCK-XXXXXXXX` reference and GET lists it back scoped to the signed-in user; the existing hallucination-guard and fallback-routing behavior from the scenario matrix above is unchanged under the new auth-gated flow.
+
+Not re-verified in this pass: the live Vercel deployment (this work was scoped local-only, per project decision, pending review before any deploy) and a live-model (non-mock) pass against the new auth flow — the Gemini/Cerebras live-model results above were captured before this rewrite and describe the pre-auth version of `/api/chat`, which no longer matches the current request/response contract (see `docs/api-examples.md`).
 
 ## Known gaps
 

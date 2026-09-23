@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { ZodError } from "zod";
 import { checkAvailability, ValidationError } from "./availability";
-import { conversationStore, type ConversationStore } from "./conversation";
+import { ConversationAccessError, deriveTitle, defaultConversationRepo, type ConversationRepo } from "./conversationRepo";
 import { CONTACT_LINE, HOTEL_NAME, retrieve } from "./knowledge";
 import { getProvider } from "./llm";
 import { type LLMProvider, type ModelTurn } from "./llm/provider";
@@ -14,7 +14,7 @@ import {
   type ChatResponse,
 } from "./types";
 
-export type Deps = { provider?: LLMProvider; store?: ConversationStore; today?: Date };
+export type Deps = { provider?: LLMProvider; repo?: ConversationRepo; today?: Date };
 export type HandlerResult = { status: number; body: ChatResponse };
 
 const FALLBACK_TEXT = `I'm not able to answer that from the information I have about ${HOTEL_NAME}. ${CONTACT_LINE}`;
@@ -22,10 +22,14 @@ const UNAVAILABLE_TEXT = `I'm having trouble reaching my assistant service right
 
 const AVAILABILITY_HINT = /(availab|vacan|free room|book|reserv|any rooms|rooms? (for|on|from)|check[- ]?in .* check[- ]?out|stay (from|on))/i;
 
-/** Main entry. Pure function of (request, deps); the HTTP route is a thin wrapper. */
-export async function handleChat(input: unknown, deps: Deps = {}): Promise<HandlerResult> {
+/**
+ * Main entry. Pure function of (request, userId, deps); the HTTP route is a thin wrapper.
+ * History and slot memory are sourced entirely from the repo (Supabase in production) — the
+ * client sends only the message and, optionally, the id of an existing thread it owns.
+ */
+export async function handleChat(input: unknown, userId: string, deps: Deps = {}): Promise<HandlerResult> {
   const started = Date.now();
-  const store = deps.store ?? conversationStore;
+  const repo = deps.repo ?? defaultConversationRepo();
   const today = deps.today ?? new Date();
 
   let req;
@@ -37,8 +41,17 @@ export async function handleChat(input: unknown, deps: Deps = {}): Promise<Handl
     return { status: 400, body: { type: "error", message: msg, code: "INVALID_REQUEST" } };
   }
 
-  const conversationId = req.conversationId ?? randomUUID();
-  const history = store.mergeHistory(conversationId, req.history);
+  let conversationId: string;
+  try {
+    conversationId = await repo.ensure(req.conversationId, userId);
+  } catch (e) {
+    if (e instanceof ConversationAccessError) {
+      return { status: 404, body: { type: "error", message: "Conversation not found.", code: "NOT_FOUND" } };
+    }
+    throw e;
+  }
+
+  const history = await repo.history(conversationId);
   const requestId = randomUUID().slice(0, 8);
   const done = (status: number, body: ChatResponse, extra: Record<string, unknown> = {}): HandlerResult => {
     log("info", "chat.response", { requestId, conversationId, type: body.type, status, ms: Date.now() - started, ...extra });
@@ -47,12 +60,14 @@ export async function handleChat(input: unknown, deps: Deps = {}): Promise<Handl
 
   // Structured availability request from the date form: no LLM involved.
   if (req.availability) {
-    store.rememberSlots(conversationId, req.availability);
+    await repo.mergeSlots(conversationId, req.availability);
     try {
       const result = checkAvailability(req.availability, { today });
       const message = describeAvailability(result);
-      store.append(conversationId, { role: "user", content: describeRequest(req.availability) }, { role: "assistant", content: message });
-      return done(200, { type: "availability", conversationId, message, data: result });
+      const body: ChatResponse = { type: "availability", conversationId, message, data: result };
+      await repo.appendTurn(conversationId, { role: "user", content: describeRequest(req.availability) }, { role: "assistant", content: message, envelope: body });
+      await repo.titleIfUnset(conversationId, deriveTitle(describeRequest(req.availability)));
+      return done(200, body);
     } catch (e) {
       if (e instanceof ValidationError) {
         return done(400, { type: "error", conversationId, message: e.message, code: "INVALID_STAY" });
@@ -78,8 +93,9 @@ export async function handleChat(input: unknown, deps: Deps = {}): Promise<Handl
   }
   const cls = turn;
 
-  const finish = (body: ChatResponse, extra: Record<string, unknown> = {}) => {
-    store.append(conversationId, { role: "user", content: message }, { role: "assistant", content: body.message });
+  const finish = async (body: ChatResponse, extra: Record<string, unknown> = {}) => {
+    await repo.appendTurn(conversationId, { role: "user", content: message }, { role: "assistant", content: body.message, envelope: body });
+    await repo.titleIfUnset(conversationId, deriveTitle(message));
     return done(200, body, { intent: cls.intent, ...extra });
   };
 
@@ -92,7 +108,7 @@ export async function handleChat(input: unknown, deps: Deps = {}): Promise<Handl
   }
 
   if (cls.intent === "availability") {
-    const known = store.rememberSlots(conversationId, cls.slots);
+    const known = await repo.mergeSlots(conversationId, cls.slots);
     const parsed = AvailabilityParamsSchema.safeParse(known);
     if (!parsed.success) {
       const needs = (["checkIn", "checkOut", "adults"] as const).filter((k) => known[k] === undefined);

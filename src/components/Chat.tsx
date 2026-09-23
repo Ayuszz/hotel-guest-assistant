@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
-import { ApiError, sendChat, type ChatResponse, type HistoryTurn } from "@/lib/api";
+import { ApiError, fetchMessages, sendChat, type ChatResponse, type StoredMessage } from "@/lib/api";
 import type { AvailabilityParams, AvailabilityResult } from "@/server/types";
 import { AvailabilityCard } from "./AvailabilityCard";
 import { AvailabilityForm } from "./AvailabilityForm";
@@ -23,15 +23,35 @@ const SUGGESTIONS = [
 ];
 
 const REQUEST_TIMEOUT_MS = 35_000;
-const HISTORY_LIMIT = 10;
 let counter = 0;
 const nextId = () => `${Date.now()}-${counter++}`;
 
-export function Chat({ send = sendChat }: { send?: typeof sendChat }) {
-  const [conversationId] = useState(() =>
-    typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : String(Math.random()),
-  );
+function toUi(id: string, res: ChatResponse, resolved = false): UiMessage {
+  switch (res.type) {
+    case "text": return { id, role: "assistant", kind: "text", text: res.message };
+    case "fallback": return { id, role: "assistant", kind: "fallback", text: res.message };
+    case "availability": return { id, role: "assistant", kind: "availability", text: res.message, data: res.data };
+    case "clarification": return { id, role: "assistant", kind: "clarification", text: res.message, known: res.known, resolved };
+    case "error": return { id, role: "assistant", kind: "error", text: res.message, retry: () => {} };
+  }
+}
+
+function rowToUi(row: StoredMessage): UiMessage {
+  if (row.role === "user") return { id: row.id, role: "user", text: row.content };
+  if (row.envelope) return toUi(row.id, row.envelope, true);
+  return { id: row.id, role: "assistant", kind: "text", text: row.content };
+}
+
+type Props = {
+  conversationId: string | null;
+  onConversationId: (id: string) => void;
+  send?: typeof sendChat;
+  load?: typeof fetchMessages;
+};
+
+export function Chat({ conversationId, onConversationId, send = sendChat, load = fetchMessages }: Props) {
   const [messages, setMessages] = useState<UiMessage[]>([]);
+  const [hydrating, setHydrating] = useState(false);
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
@@ -40,38 +60,36 @@ export function Chat({ send = sendChat }: { send?: typeof sendChat }) {
   useEffect(() => {
     const el = listRef.current;
     if (el && typeof el.scrollTo === "function") el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
-  }, [messages, pending]);
+  }, [messages, pending, hydrating]);
 
-  const historyFor = (msgs: UiMessage[]): HistoryTurn[] =>
-    msgs
-      .filter((m) => m.role === "user" || (m.kind !== "error"))
-      .map((m): HistoryTurn => ({ role: m.role, content: m.text }))
-      .slice(-HISTORY_LIMIT);
+  useEffect(() => {
+    if (!conversationId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- resetting to a fresh thread, not a derivable value
+      setMessages([]);
+      return;
+    }
+    let cancelled = false;
+    setHydrating(true);
+    load(conversationId)
+      .then((rows) => { if (!cancelled) setMessages(rows.map(rowToUi)); })
+      .catch(() => { if (!cancelled) setMessages([]); })
+      .finally(() => { if (!cancelled) setHydrating(false); });
+    return () => { cancelled = true; };
+  }, [conversationId, load]);
 
   const push = (m: UiMessage) => setMessages((prev) => [...prev, m]);
-
-  const toUi = (res: ChatResponse): UiMessage => {
-    const id = nextId();
-    switch (res.type) {
-      case "text": return { id, role: "assistant", kind: "text", text: res.message };
-      case "fallback": return { id, role: "assistant", kind: "fallback", text: res.message };
-      case "availability": return { id, role: "assistant", kind: "availability", text: res.message, data: res.data };
-      case "clarification": return { id, role: "assistant", kind: "clarification", text: res.message, known: res.known };
-      case "error": return { id, role: "assistant", kind: "error", text: res.message, retry: () => {} };
-    }
-  };
 
   const perform = async (payload: { message?: string; availability?: AvailabilityParams }, echo: string) => {
     if (pending) return;
     const userMsg: UiMessage = { id: nextId(), role: "user", text: echo };
-    const base = messages;
     setMessages((prev) => [...prev.map((m) => (m.role === "assistant" && m.kind === "clarification" ? { ...m, resolved: true } : m)), userMsg]);
     setPending(true);
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), REQUEST_TIMEOUT_MS);
     try {
-      const res = await send({ conversationId, ...payload, history: historyFor(base), signal: ctrl.signal });
-      push(toUi(res));
+      const res = await send({ conversationId: conversationId ?? undefined, ...payload, signal: ctrl.signal });
+      push(toUi(nextId(), res));
+      if (res.conversationId) onConversationId(res.conversationId);
     } catch (e) {
       const text = e instanceof ApiError ? e.message : "Something went wrong. Please try again.";
       push({ id: nextId(), role: "assistant", kind: "error", text, retry: () => {
@@ -99,9 +117,10 @@ export function Chat({ send = sendChat }: { send?: typeof sendChat }) {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full min-h-0">
       <div ref={listRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-3" data-testid="message-list">
-        {messages.length === 0 && (
+        {hydrating && <p className="text-center text-xs text-stone-400 pt-6">Loading conversation…</p>}
+        {!hydrating && messages.length === 0 && (
           <div className="max-w-md mx-auto text-center pt-6">
             <p className="text-stone-700 text-sm mb-4">Hi! Ask me anything about Marigold Bay Hotel, or check if we have rooms for your dates.</p>
             <div className="flex flex-wrap justify-center gap-2">
@@ -114,7 +133,7 @@ export function Chat({ send = sendChat }: { send?: typeof sendChat }) {
             </div>
           </div>
         )}
-        {messages.map((m) => <Bubble key={m.id} m={m} pending={pending} onAvailability={submitAvailability} />)}
+        {!hydrating && messages.map((m) => <Bubble key={m.id} m={m} pending={pending} conversationId={conversationId} onAvailability={submitAvailability} />)}
         {pending && <TypingIndicator />}
       </div>
       <form onSubmit={submitText} className="border-t border-stone-200 bg-white px-3 py-3 flex gap-2 items-center sticky bottom-0" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
@@ -131,7 +150,7 @@ export function Chat({ send = sendChat }: { send?: typeof sendChat }) {
   );
 }
 
-function Bubble({ m, pending, onAvailability }: { m: UiMessage; pending: boolean; onAvailability: (p: AvailabilityParams) => void }) {
+function Bubble({ m, pending, conversationId, onAvailability }: { m: UiMessage; pending: boolean; conversationId: string | null; onAvailability: (p: AvailabilityParams) => void }) {
   if (m.role === "user") {
     return (
       <div className="flex justify-end">
@@ -147,7 +166,7 @@ function Bubble({ m, pending, onAvailability }: { m: UiMessage; pending: boolean
     <div className="flex justify-start">
       <div className={`max-w-[92%] sm:max-w-[78%] rounded-2xl rounded-bl-sm border px-4 py-2.5 text-sm shadow-sm ${tone}`} data-testid={`assistant-${m.kind}`}>
         <p className="whitespace-pre-wrap">{m.text}</p>
-        {m.kind === "availability" && <AvailabilityCard data={m.data} />}
+        {m.kind === "availability" && <AvailabilityCard data={m.data} conversationId={conversationId} />}
         {m.kind === "clarification" && !m.resolved && <AvailabilityForm known={m.known} disabled={pending} onSubmit={onAvailability} />}
         {m.kind === "error" && (
           <button type="button" onClick={m.retry} disabled={pending} className="mt-2 text-xs font-medium underline underline-offset-2">

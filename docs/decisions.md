@@ -22,6 +22,30 @@ Guests researching a stay have small, urgent questions (check-in time, pool, bre
 - **Suggested questions** double as onboarding and as a manual test surface for the reviewer.
 - **Mobile first**: single column, sticky input with safe-area padding, tested at Pixel 7 and desktop widths in Playwright.
 
+## Why does the app require sign-in?
+
+Conversations and bookings need a stable owner (`user_id`) to be listable and recoverable across sessions and devices. An anonymous-then-claim-on-signup flow was considered and rejected: it adds a merge step (reattach anonymous threads to the new account) for no benefit at this scale, and a hard login wall is simpler to reason about and to test. Supabase email/password auth (sign-up creates the user pre-confirmed via the admin API, since no SMTP provider is configured for this assignment) is the entire auth surface — no OAuth, no magic links, no password reset flow.
+
+## Why service-role key server-side, not RLS with a forwarded client token?
+
+Two ways to enforce "a guest only sees their own data": forward the guest's Supabase access token to Postgres and let row-level security do the filtering, or have the server hold the service-role key (which bypasses RLS) and filter every query by `user_id` explicitly. This app uses the second. Reasoning: the server already authenticates the request via the session cookie before touching the database, so there is one trust boundary (the route handler), not two (the route handler and the database's view of the forwarded token); ownership checks (`.eq("user_id", user.id)`) are explicit and visible in `conversationRepo.ts`, `auth.ts` and the bookings/conversations routes rather than implicit in a policy file. RLS policies are still defined in `scripts/supabase-schema.sql` and enabled on every table, as defense-in-depth in case a client ever queries Postgres directly with the anon key — they are just not the primary enforcement mechanism.
+
+## Why Supabase over a custom auth + database stack?
+
+Managed Postgres, auth, and a free tier in one product, with no separate service to operate for a take-home-scale app. The alternative (a custom JWT/session implementation over a self-hosted or third-party Postgres) buys nothing here and costs setup and maintenance time. The trade-off is a vendor dependency and the service-role key becoming a single point of trust — acceptable for this scope, called out as a future item below.
+
+## Why simulated payments instead of a real gateway?
+
+A "Book & pay (mock)" button marks the booking `confirmed`/`paid` with a `MOCK-XXXXXXXX` reference in the same request — no card details are collected, no gateway is called, no PCI surface exists in this codebase. This was an explicit scope decision: the assignment needed a booking flow to demonstrate end-to-end persistence and UX, not a production payment integration. See "What would we improve before production?" for the real-gateway item.
+
+## Why auto-title threads from the first message instead of asking the model?
+
+`deriveTitle()` truncates the first message to 60 characters. It costs no extra model call, is deterministic, and is good enough for a sidebar label. Rename/delete were explicitly left out of scope for this pass.
+
+## Why 404, not 403, when a guest requests another user's conversation or booking?
+
+`ConversationRepo.ensure()` and the conversation-messages route return "not found" rather than "forbidden" when the requested id exists but belongs to a different user. A 403 confirms the id is valid, which is a (small) information leak; a 404 gives no signal either way.
+
 ## Which parts use AI and which stay deterministic?
 
 | AI (LLM) | Deterministic code |
@@ -81,14 +105,17 @@ Every request logs one JSON line with request id, conversation id, response type
 ## What would we improve before production?
 
 1. Real availability from the property management system, with rate plans and holds.
-2. Streaming responses and a smaller router model for latency.
-3. Persist conversations (Redis or Postgres) with retention policy and PII handling.
-4. Rate limiting and abuse protection on `/api/chat`; per-day cost caps on the model.
-5. Embedding-based retrieval once the knowledge base outgrows keyword matching; a content admin UI for hotel staff.
-6. Eval harness in CI against the live model with pass thresholds, plus human review of sampled conversations.
-7. Multilingual support and accessibility audit.
-8. Analytics events for the funnel above; feedback buttons.
-9. Handoff to a human channel (WhatsApp, email form) when the fallback fires twice in a row.
+2. A real payment gateway (Stripe or similar) behind the "Book & pay" step, replacing the simulated one.
+3. Streaming responses and a smaller router model for latency.
+4. Thread rename and delete; currently threads can only be created and switched between.
+5. Move enforcement fully onto RLS with a forwarded client token, dropping the service-role dependency, once the query surface is stable enough to audit as policies instead of code.
+6. Rate limiting and abuse protection on `/api/chat` and `/api/bookings`; per-day cost caps on the model.
+7. Embedding-based retrieval once the knowledge base outgrows keyword matching; a content admin UI for hotel staff.
+8. Eval harness in CI against the live model with pass thresholds, plus human review of sampled conversations.
+9. Multilingual support and accessibility audit.
+10. Analytics events for the chat and booking funnels; feedback buttons.
+11. Handoff to a human channel (WhatsApp, email form) when the fallback fires twice in a row.
+12. Real transactional email (Supabase's own confirmation flow or an SMTP provider) instead of pre-confirming accounts on signup.
 
 ## Engineering choices, briefly
 
@@ -97,7 +124,8 @@ Every request logs one JSON line with request id, conversation id, response type
 | Next.js route handlers for the backend | One deploy, one language, free hosting on Vercel with no cold-sleep; still a separate `src/server` module with its own tests | Separate Express/Fastify service: free hosts sleep 30 to 60 s, hurting the demo |
 | Cerebras gpt-oss-120b primary, Groq and Gemini as optional fallbacks | All free tiers with JSON output. Gemini free tier was slow (10 to 20 s) and overloaded during evaluation; Cerebras answers in about a second. A provider chain plus per-provider model chain keeps the demo alive when any one is down | Anthropic/OpenAI: paid |
 | Provider interface + mock | Tests need no key; app runs offline; a new provider is one file implementing `respond()` | Mocking `fetch` per test: brittle |
-| Client-carried history | Correct on serverless; the server store is a bonus | Server-only memory: breaks across instances |
+| `ConversationRepo` interface (in-memory + Supabase) | Server-side persistence, correct across serverless instances; tests inject the in-memory implementation and never touch a real database | Client-carried history: worked around instance-local memory loss, but "nothing local" and per-account recoverable history ruled it out |
 | Zod validation | Typed request schema with readable errors | Manual checks |
 | JSON knowledge base | Small, reviewable by hotel staff, versioned in git | Database: extra setup for reviewers |
-| Vitest + Playwright | One test runner for server and UI; real browser for the demo path on desktop and mobile | Jest: slower TS setup |
+| Vitest + Playwright | One test runner for server and UI; real browser for the demo path on desktop and mobile, run against a real Supabase project with the mock LLM | Jest: slower TS setup |
+| Supabase (Auth + Postgres) | Managed, free tier, one place for auth and data, `@supabase/ssr` gives cookie-based sessions the middleware and server components can both read | Custom auth/session stack: more code, more to get wrong, no benefit at this scale |

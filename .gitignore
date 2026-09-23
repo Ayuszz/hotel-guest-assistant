@@ -14,3 +14,10 @@ next-env.d.ts
 
 # private interview-prep material, kept outside the repo
 deliverables/10-submission-kit.*
+
+# AI assistant tooling / scratch — not part of the assignment submission
+CLAUDE.md
+AGENTS.md
+.claude/
+ui-review/
+scripts/ui-review-shots.mjs
